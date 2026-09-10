@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SkyTap</title>
+<style>
+:root {
+  --bg:#0c0c0d; --panel:#161618; --elev:#1c1c1f; --line:#2a2a2e;
+  --text:#f4f4f5; --muted:#a1a1aa; --acc:#c4a574; --acc2:#8b7355;
+  --ok:#34d399; --warn:#eab308; --bad:#f87171; --radius:8px;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing:border-box; }
+html, body { height:100%; }
+body { margin:0; font:13px/1.45 var(--sans); background:var(--bg); color:var(--text); }
+html[dir="rtl"] { direction:rtl; }
+::-webkit-scrollbar { width:8px; height:8px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:#3f3f46; border-radius:8px; }
+* { scrollbar-width:thin; scrollbar-color:#3f3f46 var(--bg); }
+
+header {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel);
+}
+.brand { font-size:14px; font-weight:650; letter-spacing:.18em; margin:0; color:var(--acc); }
+.pill { font-size:10px; padding:3px 8px; border-radius:99px; background:var(--elev); color:var(--muted); border:1px solid var(--line); }
+.pill.ok { color:var(--ok); border-color:#14532d; }
+.pill.warn { color:var(--warn); border-color:#713f12; }
+.pill.bad { color:var(--bad); border-color:#7f1d1d; }
+.grow { flex:1; min-width:8px; }
+#lang { width:auto; min-width:7.5rem; }
+main {
+  display:grid; grid-template-columns: minmax(220px,280px) minmax(0,1fr) minmax(260px,360px);
+  height:calc(100vh - 48px);
+}
+@media (max-width: 980px) {
+  main { grid-template-columns:1fr; height:auto; min-height:calc(100vh - 48px); }
+  .col { border-right:none !important; border-bottom:1px solid var(--line); max-height:none; }
+}
+.col { overflow:auto; border-right:1px solid var(--line); padding:14px 16px 32px; }
+.col:last-child { border-right:none; }
+h2 { font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); margin:0 0 8px; font-weight:600; }
+table { width:100%; border-collapse:collapse; }
+th { font-size:10px; color:var(--muted); letter-spacing:.08em; font-weight:500; }
+th,td { text-align:start; padding:8px 4px; border-bottom:1px solid var(--line); }
+tr { cursor:pointer; }
+tr:hover { background:var(--elev); }
+tr.sel { background:#222225; box-shadow:inset 2px 0 0 var(--acc); }
+html[dir="rtl"] tr.sel { box-shadow:inset -2px 0 0 var(--acc); }
+select,input,textarea,button {
+  font:inherit; background:var(--elev); color:var(--text);
+  border:1px solid var(--line); border-radius:6px; padding:7px 9px; width:100%;
+}
+button { width:auto; cursor:pointer; }
+button.primary { background:var(--acc); color:#1a140c; border-color:transparent; font-weight:650; }
+button.ghost { background:transparent; }
+button.danger { background:transparent; color:var(--bad); border-color:#7f1d1d; }
+button:disabled { opacity:.4; cursor:not-allowed; }
+.flow {
+  padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius);
+  margin-bottom:8px; cursor:pointer; background:var(--elev);
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+}
+.flow:hover { border-color:var(--acc2); }
+.flow.sel { border-color:var(--acc); }
+.flow .m { font-weight:700; color:var(--acc); min-width:42px; font-size:11px; }
+.badge { font-size:10px; padding:2px 6px; border-radius:4px; background:#27272a; color:var(--muted); }
+.badge.mock { background:#422006; color:var(--warn); }
+.badge.rw { background:#292524; color:var(--acc); }
+pre { white-space:pre-wrap; word-break:break-all; background:#09090b; padding:8px; border-radius:6px; font-size:11px; max-height:140px; overflow:auto; margin:6px 0 0; }
+label { display:block; font-size:11px; color:var(--muted); margin:8px 0 4px; }
+#login { position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; z-index:20; }
+#login.hid { display:none; }
+#login .box { background:var(--panel); padding:28px; border-radius:12px; width:min(360px,92vw); border:1px solid var(--line); }
+.card { background:var(--elev); border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; margin-top:14px; }
+.hint { color:var(--muted); font-size:12px; margin:0 0 10px; }
+details.card summary { cursor:pointer; list-style:none; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+details.card summary::-webkit-details-marker { display:none; }
+.fp { font-family:ui-monospace,monospace; font-size:10px; color:var(--muted); }
+.actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.rule-card { border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; margin-bottom:8px; background:var(--elev); }
+.rule-card .rh { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.toast {
+  position:fixed; bottom:16px; inset-inline-end:16px; background:var(--panel); border:1px solid var(--acc2);
+  padding:10px 14px; border-radius:8px; z-index:30; display:none; max-width:min(360px,90vw);
+}
+.toast.show { display:block; }
+.toast.err { border-color:var(--bad); }
+.empty { color:var(--muted); padding:20px 12px; text-align:center; border:1px dashed var(--line); border-radius:var(--radius); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <p class="brand">SKYTAP</p>
+  <span class="pill" id="bindPill">—</span>
+  <span class="pill" id="wsPill">ws</span>
+  <span class="pill" id="caPill">CA</span>
+  <span class="grow"></span>
+  <select id="lang" aria-label="Language"></select>
+  <button type="button" class="ghost" id="caBtn" data-i="ca_dl">Download CA</button>
+</header>
+<main>
+  <div class="col">
+    <h2 data-i="domains">Domains</h2>
+    <p class="hint" data-i="domains_h">OBSERVED leaves TLS intact. INTERCEPT decrypts. MOCK returns a local reply.</p>
+    <table>
+      <thead><tr><th data-i="host">Host</th><th data-i="mode">Mode</th><th></th></tr></thead>
+      <tbody id="domains"></tbody>
+    </table>
+    <details class="card" id="caCard">
+      <summary data-i="ca_sum">Certificate</summary>
+      <p class="hint" style="margin-top:8px" data-i="ca_h">Clients you decrypt must trust this CA. Detected OS chooses the install path.</p>
+      <div id="caInstalled"></div>
+      <div class="fp" id="caFp"></div>
+      <div class="actions">
+        <button type="button" class="primary" id="caTrustBtn" data-i="ca_install">Install CA here</button>
+      </div>
+    </details>
+  </div>
+  <div class="col">
+    <h2><span data-i="traffic">Traffic</span> <span id="flowHost"></span></h2>
+    <p class="hint" data-i="traffic_h">Select a host, then mock or rewrite a request.</p>
+    <div id="flows"></div>
+    <div id="detail"></div>
+  </div>
+  <div class="col">
+    <h2 data-i="rules">Rules</h2>
+    <p class="hint" data-i="rules_h">Persisted on disk. Mock skips upstream; rewrite still forwards.</p>
+    <div id="rulesList"></div>
+    <h2 style="margin-top:18px" data-i="new_rule">New rule</h2>
+    <p class="hint" id="ruleHint" data-i="rule_h"></p>
+    <form id="ruleForm">
+      <label data-i="kind">Kind</label>
+      <select name="action">
+        <option value="mock" data-i="kind_mock">Mock</option>
+        <option value="rewrite" data-i="kind_rw">Rewrite</option>
+      </select>
+      <label data-i="host">Host</label><input name="host" required/>
+      <label data-i="path">Path</label><input name="path" placeholder="/api/verify"/>
+      <label data-i="method">Method</label><input name="method" placeholder="POST"/>
+      <div id="mockFields">
+        <label data-i="status">Status</label><input name="status" type="number" value="200"/>
+        <label>Content-Type</label><input name="content_type" value="application/json"/>
+        <label data-i="res_body">Response body</label>
+        <textarea name="body" rows="5">{"ok":true}</textarea>
+      </div>
+      <div id="rewriteFields" style="display:none">
+        <label data-i="rw_json">JSON fields to set</label>
+        <textarea name="rewrite_json" rows="5">{
+  "domain": "test.com"
+}</textarea>
+      </div>
+      <div class="actions">
+        <button class="primary" type="submit" data-i="save">Save</button>
+      </div>
+    </form>
+  </div>
+</main>
+<div id="toast" class="toast"></div>
+<div id="login">
+  <div class="box">
+    <h2 data-i="token">Admin token</h2>
+    <p class="hint" data-i="token_h">Same as -admin-token</p>
+    <input id="tok" type="password" autocomplete="off"/>
+    <div class="actions"><button class="primary" id="tokBtn" style="width:100%" data-i="continue">Continue</button></div>
+  </div>
+</div>
+<script>
+const I18N = {
+  en: {
+    domains:"Domains", domains_h:"OBSERVED leaves TLS intact. INTERCEPT decrypts. MOCK returns a local reply.",
+    host:"Host", mode:"Mode", traffic:"Traffic", traffic_h:"Select a host, then mock or rewrite a request.",
+    rules:"Rules", rules_h:"Persisted on disk. Mock skips upstream; rewrite still forwards.",
+    new_rule:"New rule", rule_h:"Mock never hits the server. Rewrite still does, with JSON patched.",
+    kind:"Kind", kind_mock:"Mock — fake response", kind_rw:"Rewrite — change request, then forward",
+    path:"Path", method:"Method", status:"Status", res_body:"Response body", rw_json:"JSON fields to set",
+    save:"Save", ca_dl:"Download CA", ca_sum:"Certificate", ca_h:"Decrypt clients must trust this CA. Path follows the OS SkyTap is running on.",
+    ca_install:"Install CA here", ca_ok:"Trusted on this OS", ca_mark:"Will restore on start", ca_no:"Not in this OS store",
+    token:"Admin token", token_h:"Same as -admin-token", continue:"Continue",
+    empty_host:"Pick a domain.", empty_flow:"No requests for this host yet.",
+    empty_rules:"No rules yet.", mock:"Mock", rewrite:"Rewrite", del:"Delete",
+    saved_m:"Mock saved", saved_r:"Rewrite saved", deleted:"Rule deleted", filled:"Form filled — save on the right",
+    ca_done:"CA installed", any:"(any host)", req:"Request", res:"Response"
+  },
+  tr: {
+    domains:"Alan adları", domains_h:"OBSERVED TLS’e dokunmaz. INTERCEPT çözer. MOCK yerel cevap döner.",
+    host:"Host", mode:"Mod", traffic:"Trafik", traffic_h:"Alan seçin; ardından sahte cevap veya istek değişimi.",
+    rules:"Kurallar", rules_h:"Diskte saklanır. Mock upstream’e gitmez; rewrite gider.",
+    new_rule:"Yeni kural", rule_h:"Mock sunucuya gitmez. Rewrite JSON’u değiştirip iletir.",
+    kind:"Tür", kind_mock:"Mock — sahte cevap", kind_rw:"Rewrite — isteği değiştir, ilet",
+    path:"Yol", method:"Yöntem", status:"Durum", res_body:"Cevap gövdesi", rw_json:"Yazılacak JSON alanları",
+    save:"Kaydet", ca_dl:"CA indir", ca_sum:"Sertifika", ca_h:"Çözülen istemci bu CA’ya güvenmeli. Yol, SkyTap’ın çalıştığı işletim sistemine göredir.",
+    ca_install:"CA’yı buraya kur", ca_ok:"Bu OS deposunda", ca_mark:"Açılışta yeniden kurulur", ca_no:"Bu OS deposunda yok",
+    token:"Yönetici jetonu", token_h:"-admin-token ile aynı", continue:"Devam",
+    empty_host:"Soldan alan seçin.", empty_flow:"Bu host için henüz istek yok.",
+    empty_rules:"Kural yok.", mock:"Sahte", rewrite:"Değiştir", del:"Sil",
+    saved_m:"Mock kaydedildi", saved_r:"Rewrite kaydedildi", deleted:"Kural silindi", filled:"Form doldu — sağdan kaydedin",
+    ca_done:"CA kuruldu", any:"(tüm hostlar)", req:"İstek", res:"Cevap"
+  },
+  ar: {
+    domains:"النطاقات", domains_h:"OBSERVED لا يلمس TLS. INTERCEPT يفك التشفير. MOCK يرد محلياً.",
+    host:"المضيف", mode:"الوضع", traffic:"المرور", traffic_h:"اختر نطاقاً ثم زيّف الرد أو عدّل الطلب.",
+    rules:"القواعد", rules_h:"تُحفظ على القرص. المحاكاة لا تصل للخادم؛ التعديل يصل.",
+    new_rule:"قاعدة جديدة", rule_h:"المحاكاة لا تلمس الخادم. التعديل يغيّر JSON ثم يمرّر.",
+    kind:"النوع", kind_mock:"محاكاة — رد مزيف", kind_rw:"تعديل — غيّر الطلب ثم أرسل",
+    path:"المسار", method:"الطريقة", status:"الحالة", res_body:"جسم الرد", rw_json:"حقول JSON للكتابة",
+    save:"حفظ", ca_dl:"تنزيل CA", ca_sum:"الشهادة", ca_h:"العميل الذي تُفكّ تشفيره يجب أن يثق بهذه الشهادة. المسار حسب نظام تشغيل SkyTap.",
+    ca_install:"تثبيت CA هنا", ca_ok:"موجودة في مخزن هذا النظام", ca_mark:"ستُعاد عند التشغيل", ca_no:"ليست في مخزن هذا النظام",
+    token:"رمز الإدارة", token_h:"نفس -admin-token", continue:"متابعة",
+    empty_host:"اختر نطاقاً.", empty_flow:"لا طلبات لهذا المضيف بعد.",
+    empty_rules:"لا قواعد.", mock:"محاكاة", rewrite:"تعديل", del:"حذف",
+    saved_m:"حُفظت المحاكاة", saved_r:"حُفظ التعديل", deleted:"حُذفت القاعدة", filled:"امتلأ النموذج — احفظ يميناً",
+    ca_done:"ثُبّتت الشهادة", any:"(أي مضيف)", req:"الطلب", res:"الرد"
+  },
+  ru: {
+    domains:"Домены", domains_h:"OBSERVED не трогает TLS. INTERCEPT расшифровывает. MOCK отвечает локально.",
+    host:"Хост", mode:"Режим", traffic:"Трафик", traffic_h:"Выберите хост, затем подмена ответа или запроса.",
+    rules:"Правила", rules_h:"Хранятся на диске. Mock не ходит на сервер; rewrite ходит.",
+    new_rule:"Новое правило", rule_h:"Mock не касается сервера. Rewrite меняет JSON и пересылает.",
+    kind:"Тип", kind_mock:"Mock — поддельный ответ", kind_rw:"Rewrite — изменить запрос и отправить",
+    path:"Путь", method:"Метод", status:"Статус", res_body:"Тело ответа", rw_json:"JSON-поля для записи",
+    save:"Сохранить", ca_dl:"Скачать CA", ca_sum:"Сертификат", ca_h:"Клиент, чей HTTPS вы расшифровываете, должен доверять этому CA. Путь зависит от ОС, где запущен SkyTap.",
+    ca_install:"Установить CA здесь", ca_ok:"В хранилище этой ОС", ca_mark:"Будет восстановлен при старте", ca_no:"Нет в хранилище этой ОС",
+    token:"Токен администратора", token_h:"Как -admin-token", continue:"Далее",
+    empty_host:"Выберите домен.", empty_flow:"Пока нет запросов для этого хоста.",
+    empty_rules:"Правил нет.", mock:"Mock", rewrite:"Rewrite", del:"Удалить",
+    saved_m:"Mock сохранён", saved_r:"Rewrite сохранён", deleted:"Правило удалено", filled:"Форма заполнена — сохраните справа",
+    ca_done:"CA установлен", any:"(любой хост)", req:"Запрос", res:"Ответ"
+  }
+};
+const LANG_KEY = "skytap_lang";
+let lang = localStorage.getItem(LANG_KEY) || (navigator.language||"en").slice(0,2);
+if (!I18N[lang]) lang = "en";
+function t(k) { return (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k; }
+function applyI18n() {
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  document.querySelectorAll("[data-i]").forEach(el => { el.textContent = t(el.getAttribute("data-i")); });
+}
+
+const TOKEN_KEY = "skytap_token";
+const HOST_KEY = "skytap_host";
+let token = sessionStorage.getItem(TOKEN_KEY) || new URLSearchParams(location.search).get("token") || "";
+let selectedHost = sessionStorage.getItem(HOST_KEY) || "";
+let flows = [];
+let allRules = [];
+let selectedFlow = null;
+let lastCA = null;
+
+(function fillLang() {
+  const s = document.getElementById("lang");
+  [["en","English"],["tr","Türkçe"],["ar","العربية"],["ru","Русский"]].forEach(([v,l]) => {
+    const o = document.createElement("option"); o.value=v; o.textContent=l; if (v===lang) o.selected=true; s.appendChild(o);
+  });
+  s.onchange = () => { lang = s.value; localStorage.setItem(LANG_KEY, lang); applyI18n(); renderFlows(); renderRules(); if (lastCA) paintCA(lastCA); };
+})();
+applyI18n();
+
+function toast(msg, err) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "toast show" + (err ? " err" : "");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove("show"), 2800);
+}
+function headers(json) {
+  const h = {};
+  if (json !== false) h["Content-Type"] = "application/json";
+  if (token) h["Authorization"] = "Bearer " + token;
+  return h;
+}
+async function api(path, opt) {
+  const r = await fetch(path, Object.assign({ headers: headers() }, opt || {}));
+  if (r.status === 401) { document.getElementById("login").classList.remove("hid"); throw new Error("401"); }
+  if (!r.ok) throw new Error((await r.text()) || r.status);
+  const ct = r.headers.get("content-type") || "";
+  if (ct.includes("json")) return r.json();
+  return r.text();
+}
+document.getElementById("tokBtn").onclick = () => {
+  token = document.getElementById("tok").value;
+  sessionStorage.setItem(TOKEN_KEY, token);
+  document.getElementById("login").classList.add("hid");
+  boot();
+};
+if (token) document.getElementById("login").classList.add("hid");
+
+function stateSelect(host, cur) {
+  const s = document.createElement("select");
+  ["OBSERVED","INTERCEPTED","MOCKED"].forEach(v => {
+    const o = document.createElement("option"); o.value=v; o.textContent=v; if (v===cur) o.selected=true; s.appendChild(o);
+  });
+  s.onchange = async () => {
+    await api("/state?host=" + encodeURIComponent(host) + "&state=" + s.value);
+    toast(host + " → " + s.value);
+    loadDomains();
+  };
+  return s;
+}
+function selectHost(h) {
+  selectedHost = h;
+  sessionStorage.setItem(HOST_KEY, h);
+  document.getElementById("flowHost").textContent = h ? "· " + h : "";
+  const inp = document.querySelector("#ruleForm [name=host]");
+  if (h && inp && !inp.value) inp.value = h;
+  renderFlows();
+  renderRules();
+}
+async function loadDomains() {
+  const list = await api("/domains");
+  const tb = document.getElementById("domains");
+  tb.innerHTML = "";
+  (list||[]).sort((a,b)=>a.host.localeCompare(b.host)).forEach(d => {
+    const tr = document.createElement("tr");
+    if (d.host === selectedHost) tr.className = "sel";
+    tr.innerHTML = `<td></td><td></td><td style="color:var(--muted)">${d.hits||0}</td>`;
+    tr.children[0].textContent = d.host;
+    tr.children[1].appendChild(stateSelect(d.host, d.state));
+    tr.onclick = (e) => {
+      if (e.target.tagName==="SELECT") return;
+      document.querySelectorAll("#domains tr").forEach(x=>x.classList.remove("sel"));
+      tr.className = "sel";
+      selectHost(d.host);
+    };
+    tb.appendChild(tr);
+  });
+  if (selectedHost) document.getElementById("flowHost").textContent = "· " + selectedHost;
+}
+function fillRuleFromFlow(f, mode) {
+  const form = document.getElementById("ruleForm");
+  form.host.value = f.host || selectedHost;
+  form.path.value = f.path || "/";
+  form.method.value = f.method || "GET";
+  form.action.value = mode || "mock";
+  toggleMode();
+  if (mode === "rewrite") {
+    form.rewrite_json.value = JSON.stringify({ domain: "test.com" }, null, 2);
+  } else {
+    form.status.value = f.status || 200;
+    let body = f.res_body || "";
+    if (f.res_encoding === "base64") body = "";
+    form.body.value = body || '{"ok":true}';
+    form.content_type.value = guessType(body);
+  }
+}
+function guessType(body) {
+  const x = (body||"").trim();
+  if (x.startsWith("{") || x.startsWith("[")) return "application/json";
+  if (x.startsWith("<")) return "text/html";
+  return "text/plain";
+}
+function renderFlows() {
+  const box = document.getElementById("flows");
+  const shown = selectedHost ? flows.filter(f => f.host === selectedHost) : flows;
+  box.innerHTML = "";
+  if (!shown.length) {
+    box.innerHTML = `<div class="empty">${selectedHost ? t("empty_flow") : t("empty_host")}</div>`;
+    return;
+  }
+  shown.slice().reverse().forEach((f) => {
+    const el = document.createElement("div");
+    el.className = "flow" + (selectedFlow === f ? " sel" : "");
+    el.innerHTML = `<span class="m">${esc(f.method||"")}</span><span>${esc(f.path||"")}</span>
+      <span class="badge">${f.status||""}</span>
+      ${f.mocked?'<span class="badge mock">MOCK</span>':''}
+      <span class="badge">${f.res_size||0}B</span>
+      <button type="button" class="primary mockbtn">${t("mock")}</button>
+      <button type="button" class="ghost rewbtn">${t("rewrite")}</button>`;
+    el.querySelector(".mockbtn").onclick = (ev) => { ev.stopPropagation(); selectedFlow=f; fillRuleFromFlow(f,"mock"); toast(t("filled")); };
+    el.querySelector(".rewbtn").onclick = (ev) => { ev.stopPropagation(); selectedFlow=f; fillRuleFromFlow(f,"rewrite"); toast(t("filled")); };
+    el.onclick = () => {
+      selectedFlow = f;
+      const req = f.req_encoding==="base64" ? "[binary]\n"+(f.req_body||"") : (f.req_body||"");
+      const res = f.res_encoding==="base64" ? "[binary]\n"+(f.res_body||"") : (f.res_body||"");
+      document.getElementById("detail").innerHTML = `<div class="card"><h2>${t("req")} / ${t("res")}</h2>
+        <label>${t("req")}</label><pre></pre><label>${t("res")}</label><pre></pre></div>`;
+      const ps = document.querySelectorAll("#detail pre");
+      ps[0].textContent = req; ps[1].textContent = res;
+      renderFlows();
+    };
+    box.appendChild(el);
+  });
+}
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+}
+function renderRules() {
+  const box = document.getElementById("rulesList");
+  const rs = allRules || [];
+  if (!rs.length) {
+    box.innerHTML = `<div class="empty">${t("empty_rules")}</div>`;
+    return;
+  }
+  box.innerHTML = "";
+  rs.slice().reverse().forEach(r => {
+    const kind = (r.action === "rewrite") ? "rewrite" : "mock";
+    const card = document.createElement("div");
+    card.className = "rule-card";
+    const summary = kind === "rewrite" ? JSON.stringify(r.rewrite_json || {}) : (r.body || "").slice(0, 120);
+    card.innerHTML = `<div class="rh">
+        <span class="badge ${kind==="rewrite"?"rw":"mock"}">${kind}</span>
+        <strong>${esc(r.method||"*")} ${esc(r.path||"/")}</strong>
+        <span style="flex:1"></span>
+        <button type="button" class="danger del">${t("del")}</button>
+      </div>
+      <div class="hint">${esc(r.host||t("any"))}${kind==="mock" ? " · "+(r.status||200) : ""}</div>
+      <pre></pre>`;
+    card.querySelector("pre").textContent = summary;
+    card.querySelector(".del").onclick = async () => {
+      if (!r.id) { toast("id?", true); return; }
+      await api("/rules?id=" + encodeURIComponent(r.id), { method: "DELETE" });
+      toast(t("deleted"));
+      await loadRules();
+    };
+    box.appendChild(card);
+  });
+}
+async function loadRules() {
+  allRules = await api("/rules") || [];
+  renderRules();
+}
+function toggleMode() {
+  const a = document.querySelector("#ruleForm [name=action]").value;
+  document.getElementById("mockFields").style.display = a === "rewrite" ? "none" : "block";
+  document.getElementById("rewriteFields").style.display = a === "rewrite" ? "block" : "none";
+}
+document.querySelector("#ruleForm [name=action]").onchange = toggleMode;
+document.getElementById("ruleForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  const action = body.action || "mock";
+  const payload = { host: body.host, path: body.path, method: body.method, action };
+  if (action === "rewrite") {
+    try { payload.rewrite_json = JSON.parse(body.rewrite_json || "{}"); }
+    catch (err) { toast("JSON", true); return; }
+  } else {
+    payload.status = parseInt(body.status, 10) || 200;
+    payload.content_type = body.content_type;
+    payload.body = body.body;
+  }
+  await api("/rules", { method:"POST", body: JSON.stringify(payload) });
+  if (payload.host) {
+    const st = action === "rewrite" ? "INTERCEPTED" : "MOCKED";
+    await api("/state?host=" + encodeURIComponent(payload.host) + "&state=" + st);
+  }
+  toast(action === "rewrite" ? t("saved_r") : t("saved_m"));
+  await loadRules();
+  await loadDomains();
+  selectHost(payload.host);
+};
+function paintCA(st) {
+  lastCA = st;
+  const pill = document.getElementById("caPill");
+  const inst = document.getElementById("caInstalled");
+  if (st.installed) { pill.textContent = "CA"; pill.className = "pill ok"; inst.textContent = t("ca_ok"); }
+  else if (st.want_trust) { pill.textContent = "CA"; pill.className = "pill ok"; inst.textContent = t("ca_mark"); }
+  else { pill.textContent = "CA"; pill.className = "pill warn"; inst.textContent = t("ca_no"); }
+  const bits = [];
+  if (st.distro) bits.push(st.distro);
+  if (st.trust_path) bits.push(st.trust_path);
+  document.getElementById("caFp").textContent = bits.join(" · ") + (st.fingerprint ? " · " + st.fingerprint.slice(0,12)+"…" : "");
+  document.getElementById("caTrustBtn").disabled = !st.can_install;
+}
+async function loadCA() {
+  try { paintCA(await api("/ca/status")); } catch (e) {}
+}
+document.getElementById("caTrustBtn").onclick = async () => {
+  try {
+    paintCA(await api("/ca/trust", { method: "POST", body: "{}" }));
+    toast(t("ca_done"));
+  } catch (e) { toast(e.message, true); }
+};
+let sawSnapshot = false;
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  let url = proto + "://" + location.host + "/ws";
+  if (token) url += "?token=" + encodeURIComponent(token);
+  const ws = new WebSocket(url);
+  ws.onopen = () => { document.getElementById("wsPill").textContent = "live"; document.getElementById("wsPill").className = "pill ok"; };
+  ws.onclose = () => { document.getElementById("wsPill").textContent = "ws"; document.getElementById("wsPill").className = "pill bad"; setTimeout(connectWS, 2000); };
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === "snapshot" && Array.isArray(msg.flows)) { flows = msg.flows; sawSnapshot = true; }
+    else if (msg.type === "flow" && msg.flow) {
+      if (!sawSnapshot) return;
+      flows.push(msg.flow);
+      if (flows.length > 500) flows = flows.slice(-400);
+    }
+    renderFlows();
+  };
+}
+document.getElementById("caBtn").onclick = async () => {
+  const r = await fetch("/ca.pem", { headers: headers(false) });
+  if (!r.ok) return;
+  const blob = await r.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "skytap-ca.pem";
+  a.click();
+};
+async function boot() {
+  try {
+    const meta = await fetch("/meta").then(r => r.json());
+    document.getElementById("bindPill").textContent = meta.bind || "";
+    if (meta.auth_required && !token) { document.getElementById("login").classList.remove("hid"); return; }
+    document.getElementById("login").classList.add("hid");
+    await loadDomains();
+    await loadRules();
+    await loadCA();
+    if (selectedHost) selectHost(selectedHost);
+    connectWS();
+    setInterval(loadDomains, 5000);
+    setInterval(loadRules, 8000);
+  } catch (e) {
+    if (!token) document.getElementById("login").classList.remove("hid");
+  }
+}
+boot();
+</script>
+</body>
+</html>

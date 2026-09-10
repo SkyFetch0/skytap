@@ -1,0 +1,7 @@
+*.exe
+*.test
+*.out
+skytap
+data/
+.env
+*.pem
