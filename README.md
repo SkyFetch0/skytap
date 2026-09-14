@@ -24,7 +24,7 @@ Those two do not import each other. SkyTap wires them together with policy, pers
 
 Unknown hosts stay **OBSERVED**. Nothing is decrypted until you promote a domain.
 
-Client-facing intercept is HTTP/1.1. The origin dial copies the client ClientHello (JA3/ALPN) via uTLS; if origin negotiates `h2`, SkyTap speaks HTTP/2 upstream and translates to HTTP/1.1 toward the client. WebSocket/SSE on an INTERCEPTed host is spliced; `/flows` logs one 101/upgrade row. `-verify-upstream` checks the origin against the **system CA**. It does **not** pin SSL-kit SPKI. Pin/impersonate apply to the patched client, not SkyTap’s dial. Flow bodies are capped at 64 KiB.
+Intercept offers `h2` and `http/1.1` to the client. The origin dial copies the client ClientHello (JA3/ALPN) via uTLS. If both sides negotiate `h2`, streams are proxied as HTTP/2; otherwise HTTP/1.1. WebSocket/SSE on an INTERCEPTed host is spliced; `/flows` logs one 101/upgrade row. `-verify-upstream` checks the origin against the **system CA**. It does **not** pin SSL-kit SPKI. Pin/impersonate apply to the patched client, not SkyTap’s dial. Flow bodies are capped at 64 KiB.
 
 ---
 
