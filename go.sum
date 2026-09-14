@@ -10,6 +10,8 @@ github.com/SkyFetch0/gomitm v0.1.4 h1:CNkNZEBQCmswgEOonTb9WtXh885oImIPwIJqeCzybu
 github.com/SkyFetch0/gomitm v0.1.4/go.mod h1:MKC0avocDt5E51VUC1dH7oaERiLkO2kJiFm0p3kBaUY=
 github.com/SkyFetch0/gomitm v0.1.5 h1:wiiFtQQbunmg7sfTX72eo+2VcHc6lKk4kOuur8vb69s=
 github.com/SkyFetch0/gomitm v0.1.5/go.mod h1:MKC0avocDt5E51VUC1dH7oaERiLkO2kJiFm0p3kBaUY=
+github.com/SkyFetch0/gomitm v0.1.6 h1:mNXS0XUxe9P0eoJ8D0LuCjSb2Asn4WWwP/5umrRQdVM=
+github.com/SkyFetch0/gomitm v0.1.6/go.mod h1:MKC0avocDt5E51VUC1dH7oaERiLkO2kJiFm0p3kBaUY=
 github.com/SkyFetch0/skydst v0.1.0 h1:8awFluPguXcbabQBaM7+FFeEkABJBQlvf72eF8mmPYU=
 github.com/SkyFetch0/skydst v0.1.0/go.mod h1:OqyCLnsuNNAZ4j4gBfdWip8fHXgu/jm3RNipTQf/7rc=
 github.com/andybalholm/brotli v1.0.6 h1:Yf9fFpf49Zrxb9NlQaluyE92/+X7UVHlhMNJN2sxfOI=
