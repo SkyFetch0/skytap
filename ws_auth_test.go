@@ -19,7 +19,7 @@ import (
 func authedMux(t *testing.T, token string) *httptest.Server {
 	t.Helper()
 	pem := []byte("-----BEGIN CERTIFICATE-----\nMII\n-----END CERTIFICATE-----\n")
-	h := adminMux(t.TempDir(), NewRegistry(), NewRuleEngine(), token, NewHub(), pem, "127.0.0.1:8080")
+	h := adminMux(t.TempDir(), NewRegistry(), NewRuleEngine(), token, NewHub(), pem, "127.0.0.1:8080", nil)
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	return srv

@@ -13,7 +13,7 @@ func TestMCPTools(t *testing.T) {
 	reg := NewRegistry()
 	rules := NewRuleEngine()
 	seed(reg, rules)
-	srv := httptest.NewServer(adminMux(dir, reg, rules, "", NewHub(), nil, "127.0.0.1:8080"))
+	srv := httptest.NewServer(adminMux(dir, reg, rules, "", NewHub(), nil, "127.0.0.1:8080", nil))
 	t.Cleanup(srv.Close)
 
 	list := rpc(t, srv.URL+"/mcp", "tools/list", nil)

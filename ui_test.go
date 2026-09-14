@@ -10,7 +10,7 @@ import (
 
 func TestUIAndCAAndMeta(t *testing.T) {
 	pem := []byte("-----BEGIN CERTIFICATE-----\nMII\n-----END CERTIFICATE-----\n")
-	h := adminMux(t.TempDir(), NewRegistry(), NewRuleEngine(), "", NewHub(), pem, "127.0.0.1:8080")
+	h := adminMux(t.TempDir(), NewRegistry(), NewRuleEngine(), "", NewHub(), pem, "127.0.0.1:8080", nil)
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 
@@ -20,8 +20,14 @@ func TestUIAndCAAndMeta(t *testing.T) {
 	}
 	b, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != 200 || !strings.Contains(string(b), "SkyTap") {
+	html := string(b)
+	if resp.StatusCode != 200 || !strings.Contains(html, "SkyTap") {
 		t.Fatalf("ui %d %s", resp.StatusCode, b[:min(80, len(b))])
+	}
+	for _, need := range []string{"id=\"wb\"", "class=\"sw\"", "tpl-domains", "tpl-rules", "kitEnable", "skytap_layout"} {
+		if !strings.Contains(html, need) {
+			t.Fatalf("ui missing %q", need)
+		}
 	}
 
 	resp, err = http.Get(srv.URL + "/ca.pem")

@@ -7,7 +7,8 @@ import (
 )
 
 type persisted struct {
-	States map[string]DomainState `json:"states"`
+	States    map[string]DomainState `json:"states"`
+	PinBypass bool                   `json:"pin_bypass,omitempty"`
 }
 
 func loadPersist(dir string, reg *Registry, rules *RuleEngine) error {
@@ -17,8 +18,10 @@ func loadPersist(dir string, reg *Registry, rules *RuleEngine) error {
 	sf := filepath.Join(dir, "state.json")
 	if b, err := os.ReadFile(sf); err == nil {
 		var p persisted
-		if json.Unmarshal(b, &p) == nil && p.States != nil {
-			reg.loadStates(p.States)
+		if json.Unmarshal(b, &p) == nil {
+			if p.States != nil {
+				reg.loadStates(p.States)
+			}
 		}
 	}
 	rf := filepath.Join(dir, "rules.json")

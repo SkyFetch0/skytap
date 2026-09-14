@@ -21,7 +21,7 @@ func TestAdminSeedDomainsAndStateAndRulesAndPersist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	srv := httptest.NewServer(adminMux(dir, reg, rules, "", NewHub(), nil, "127.0.0.1:8080"))
+	srv := httptest.NewServer(adminMux(dir, reg, rules, "", NewHub(), nil, "127.0.0.1:8080", nil))
 	t.Cleanup(srv.Close)
 
 	// seed MOCKED

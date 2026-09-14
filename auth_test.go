@@ -9,7 +9,7 @@ import (
 func TestAdminTokenRequired(t *testing.T) {
 	reg := NewRegistry()
 	rules := NewRuleEngine()
-	h := adminMux(t.TempDir(), reg, rules, "secret", NewHub(), nil, "127.0.0.1:8080")
+	h := adminMux(t.TempDir(), reg, rules, "secret", NewHub(), nil, "127.0.0.1:8080", nil)
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 

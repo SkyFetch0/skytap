@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func adminMux(dataDir string, reg *Registry, rules *RuleEngine, token string, hub *Hub, caPEM []byte, bind string) http.Handler {
+func adminMux(dataDir string, reg *Registry, rules *RuleEngine, token string, hub *Hub, caPEM []byte, bind string, app *App) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/domains", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, reg.Domains())
@@ -88,8 +88,73 @@ func adminMux(dataDir string, reg *Registry, rules *RuleEngine, token string, hu
 		}
 		writeJSON(w, caStatus(caPEM, dataDir))
 	})
+	mux.HandleFunc("/sslkit", func(w http.ResponseWriter, r *http.Request) {
+		if app == nil || app.kit == nil {
+			http.Error(w, "no sslkit store", 503)
+			return
+		}
+		if r.Method == http.MethodPost {
+			var p HostSSLPolicy
+			if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			if p.Host == "" {
+				http.Error(w, "host required", 400)
+				return
+			}
+			writeJSON(w, app.kit.Put(p))
+			return
+		}
+		host := r.URL.Query().Get("host")
+		if host != "" {
+			writeJSON(w, app.kit.Get(host))
+			return
+		}
+		writeJSON(w, app.kit.All())
+	})
+	mux.HandleFunc("/sslkit/capture", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST only", 405)
+			return
+		}
+		if app == nil || app.kit == nil {
+			http.Error(w, "no sslkit store", 503)
+			return
+		}
+		var body struct {
+			Host string `json:"host"`
+			Dst  string `json:"dst"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body.Host == "" {
+			body.Host = r.URL.Query().Get("host")
+		}
+		p, err := app.kit.Capture(body.Host, body.Dst)
+		if err != nil {
+			http.Error(w, err.Error(), 502)
+			return
+		}
+		writeJSON(w, p)
+	})
+	mux.HandleFunc("/pin-bypass", func(w http.ResponseWriter, r *http.Request) {
+		if app == nil {
+			http.Error(w, "no app", 503)
+			return
+		}
+		if r.Method == http.MethodPost {
+			var body struct {
+				Enabled bool `json:"enabled"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			app.SetPinBypass(body.Enabled)
+		}
+		writeJSON(w, map[string]any{
+			"enabled": app.PinBypass(),
+		})
+	})
 	mux.HandleFunc("/meta", func(w http.ResponseWriter, r *http.Request) {
-		// Public: UI needs this before login. Never include the token itself.
+		// Public: UI needs this before login.
 		writeJSON(w, map[string]any{
 			"bind":          bind,
 			"loopback":      isLoopback(bind),
@@ -123,7 +188,7 @@ func adminMux(dataDir string, reg *Registry, rules *RuleEngine, token string, hu
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if path == "/meta" || path == "/" || path == "/index.html" {
+		if path == "/meta" || path == "/" || path == "/index.html" || path == "/pin-bypass" {
 			mux.ServeHTTP(w, r)
 			return
 		}

@@ -2,16 +2,51 @@ package main
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/SkyFetch0/gomitm"
 )
 
 // App implements gomitm.Decider using registry + rules.
 type App struct {
-	reg   *Registry
-	rules *RuleEngine
-	hub   *Hub
+	reg       *Registry
+	rules     *RuleEngine
+	hub       *Hub
+	dataDir   string
+	kit       *SSLKitStore
+	mu        sync.Mutex
+	pinBypass bool
+}
+
+func (a *App) PinBypass() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.pinBypass
+}
+
+func (a *App) SetPinBypass(v bool) {
+	a.mu.Lock()
+	a.pinBypass = v
+	dir := a.dataDir
+	a.mu.Unlock()
+	if dir != "" {
+		b := []byte("0\n")
+		if v {
+			b = []byte("1\n")
+		}
+		_ = os.WriteFile(filepath.Join(dir, "pin-bypass"), b, 0o644)
+	}
+}
+
+func loadPinBypass(dir string) bool {
+	b, err := os.ReadFile(filepath.Join(dir, "pin-bypass"))
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(b)) == "1"
 }
 
 func (a *App) OnConnect(host, dst string) gomitm.Action {

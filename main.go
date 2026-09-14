@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -17,9 +18,12 @@ import (
 
 func main() {
 	listen := flag.String("listen", ":3128", "transparent proxy listen address")
+	httpProxy := flag.String("http-proxy", "", "explicit HTTP CONNECT proxy (e.g. :8080); empty = disabled")
+	socks := flag.String("socks", "", "explicit SOCKS5 proxy (e.g. :1080); empty = disabled")
 	admin := flag.String("admin", "127.0.0.1:8080", "admin/MCP bind (default localhost; never 0.0.0.0 without -admin-token)")
 	adminToken := flag.String("admin-token", os.Getenv("SKYTAP_ADMIN_TOKEN"), "Bearer token for admin+MCP (required unless bind is loopback)")
 	data := flag.String("data", "/data", "persist dir (CA + state.json + rules.json)")
+	keyLogPath := flag.String("keylog", os.Getenv("SSLKEYLOGFILE"), "NSS TLS key log path (SSLKEYLOGFILE)")
 	install := flag.Bool("install-rules", true, "install nft/iptables capture rules")
 	mode := flag.String("mode", "output", "output|prerouting")
 	ports := flag.String("ports", "80,443", "comma-separated TCP ports to redirect")
@@ -38,12 +42,44 @@ func main() {
 		log.Fatal(err)
 	}
 	seed(reg, rules)
+	if h := os.Getenv("SKYTAP_INTERCEPT_HOSTS"); h != "" {
+		for _, name := range splitCSV(h) {
+			reg.SetState(name, StateIntercepted)
+		}
+		_ = savePersist(*data, reg, rules)
+	}
 	_ = savePersist(*data, reg, rules)
 
+	odir := os.Getenv("SKYTAP_ORIGIN_CERT_DIR")
+	if odir == "" {
+		odir = "/certs/origin-cache"
+	}
+	if err := os.MkdirAll(odir, 0o755); err == nil {
+		gomitm.SetOriginDumpDir(odir)
+		log.Printf("origin cert dump %s", odir)
+	}
+	kit := NewSSLKitStore(*data, "/certs")
 	hub := NewHub()
-	app := &App{reg: reg, rules: rules, hub: hub}
+	app := &App{reg: reg, rules: rules, hub: hub, dataDir: *data, kit: kit, pinBypass: loadPinBypass(*data)}
 	eng := gomitm.New(ca, app)
+	if *keyLogPath != "" {
+		if err := os.MkdirAll(filepath.Dir(*keyLogPath), 0o755); err != nil {
+			log.Fatal(err)
+		}
+		kl, err := os.OpenFile(*keyLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			log.Fatal(err)
+		}
+		eng = eng.WithKeyLog(io.Writer(kl))
+		log.Printf("TLS key log %s", *keyLogPath)
+	}
 	restoreCATrust(ca.CACertPEM(), *data)
+	pem := ca.CACertPEM()
+	_ = os.WriteFile(filepath.Join(*data, "ca", "ca.crt"), pem, 0o644)
+	if st, err := os.Stat("/certs"); err == nil && st.IsDir() {
+		_ = os.WriteFile("/certs/ca.crt", pem, 0o644)
+		_ = os.WriteFile("/certs/ca.pem", pem, 0o644)
+	}
 
 	if *install {
 		m := skydst.OutputRedirect
@@ -71,14 +107,20 @@ func main() {
 
 	go func() {
 		log.Printf("admin API on %s", *admin)
-		h := adminMux(*data, reg, rules, *adminToken, hub, ca.CACertPEM(), *admin)
-		if !isLoopback(*admin) && *adminToken == "" {
+		h := adminMux(*data, reg, rules, *adminToken, hub, ca.CACertPEM(), *admin, app)
+		if !isLoopback(*admin) && *adminToken == "" && os.Getenv("SKYTAP_ALLOW_OPEN_ADMIN") != "1" {
 			log.Fatal("refusing non-loopback admin bind without -admin-token / SKYTAP_ADMIN_TOKEN")
 		}
 		if err := http.ListenAndServe(*admin, h); err != nil {
 			log.Fatal(err)
 		}
 	}()
+	if *httpProxy != "" {
+		go serveHTTPProxy(*httpProxy, eng)
+	}
+	if *socks != "" {
+		go serveSOCKS5(*socks, eng)
+	}
 
 	ln, err := skydst.Listen(*listen)
 	if err != nil {
