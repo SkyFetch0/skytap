@@ -24,7 +24,7 @@ Those two do not import each other. SkyTap wires them together with policy, pers
 
 Unknown hosts stay **OBSERVED**. Nothing is decrypted until you promote a domain.
 
-Terminated TLS is HTTP/1.1 only (no `h2` ALPN). WebSocket/SSE on an INTERCEPTed host is spliced to origin; `/flows` logs one 101/upgrade row. `-verify-upstream` checks the origin against the **system CA** (hostname + chain). It does **not** pin the SPKI stored in the SSL kit. Pin/impersonate apply to the patched client (`skytap-ssl.conf`), not to SkyTap’s own dial. Flow bodies are capped at 64 KiB (`ReqTruncated` / `ResTruncated`); `ResSize` uses `Content-Length` when present.
+Client-facing intercept is HTTP/1.1. The origin dial copies the client ClientHello (JA3/ALPN) via uTLS; if origin negotiates `h2`, SkyTap speaks HTTP/2 upstream and translates to HTTP/1.1 toward the client. WebSocket/SSE on an INTERCEPTed host is spliced; `/flows` logs one 101/upgrade row. `-verify-upstream` checks the origin against the **system CA**. It does **not** pin SSL-kit SPKI. Pin/impersonate apply to the patched client, not SkyTap’s dial. Flow bodies are capped at 64 KiB.
 
 ---
 
@@ -107,6 +107,12 @@ cp ca-cert.pem /etc/ca-certificates/trust-source/anchors/skytap.crt && update-ca
 
 **Install CA here** in the UI installs into the OS where SkyTap itself is running. If the captured process lives in another container, install the PEM there too.
 
+A PHP/curl client with `CURLOPT_SSL_VERIFYPEER` on will fail TLS (often shown as a generic HTTP error) if you INTERCEPT a host before that client’s trust store has `ca-cert.pem`. `docker exec` as root is not the same user as php-fpm (`www-data`); test with the app user.
+
+Hostnames are exact. INTERCEPT on `example.com` does not decrypt `api.example.com`. Promote each name you care about.
+
+Do not point a hostname at `127.0.0.1` in the **Docker host** `hosts` file (Windows `C:\Windows\System32\drivers\etc\hosts` or Linux `/etc/hosts`). Compose copies that into the container. The app then dials loopback:443 inside its own netns and gets connection refused. Use real DNS, or `extra_hosts` to another **compose service IP**, never `127.0.0.1` for an origin you still want to reach.
+
 ---
 
 ## Docker
@@ -121,6 +127,8 @@ services:
   app:
     network_mode: "service:skytap"
 ```
+
+Copy `$DATA/ca/ca-cert.pem` into the **app** image (or a shared volume) and run `update-ca-certificates` there. The host trust store is not inherited.
 
 The host firewall is not modified; rules live in the container namespace and are reapplied on restart.
 
