@@ -42,7 +42,9 @@ func main() {
 	if err := loadPersist(*data, reg, rules); err != nil {
 		log.Fatal(err)
 	}
-	seed(reg, rules)
+	if !persistExists(*data) {
+		seed(reg, rules)
+	}
 	if h := os.Getenv("SKYTAP_INTERCEPT_HOSTS"); h != "" {
 		for _, name := range splitCSV(h) {
 			reg.SetState(name, StateIntercepted)

@@ -91,6 +91,55 @@ func TestAdminSeedDomainsAndStateAndRulesAndPersist(t *testing.T) {
 	_ = gomitm.Passthrough
 }
 
+func TestDeleteDomainAndClearHistory(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewRegistry()
+	rules := NewRuleEngine()
+	reg.SetState("gone.example", StateObserved)
+	reg.AddFlow(gomitm.Flow{Host: "gone.example", Path: "/"})
+	srv := httptest.NewServer(adminMux(dir, reg, rules, "", NewHub(), nil, "127.0.0.1:8080", nil))
+	t.Cleanup(srv.Close)
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/history?scope=flows&host=gone.example", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("clear flows %d", resp.StatusCode)
+	}
+	if len(reg.Flows("gone.example")) != 0 {
+		t.Fatal("flows still present")
+	}
+
+	req, _ = http.NewRequest(http.MethodDelete, srv.URL+"/domains?host=gone.example", nil)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("delete domain %d", resp.StatusCode)
+	}
+	for _, d := range reg.Domains() {
+		if d.Host == "gone.example" {
+			t.Fatal("domain still listed")
+		}
+	}
+
+	reg.SetState("x", StateObserved)
+	req, _ = http.NewRequest(http.MethodDelete, srv.URL+"/history?scope=all", nil)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if len(reg.Domains()) != 0 {
+		t.Fatalf("reset left %d domains", len(reg.Domains()))
+	}
+}
+
 func getJSON(t *testing.T, url string, v any) {
 	t.Helper()
 	resp, err := http.Get(url)

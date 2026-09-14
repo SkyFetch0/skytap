@@ -11,6 +11,11 @@ type persisted struct {
 	PinBypass bool                   `json:"pin_bypass,omitempty"`
 }
 
+func persistExists(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, "state.json"))
+	return err == nil
+}
+
 func loadPersist(dir string, reg *Registry, rules *RuleEngine) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err

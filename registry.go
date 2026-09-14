@@ -2,7 +2,6 @@ package main
 
 import (
 	"sync"
-	"time"
 
 	"github.com/SkyFetch0/gomitm"
 )
@@ -112,4 +111,31 @@ func (r *Registry) loadStates(m map[string]DomainState) {
 	}
 }
 
-func (r *Registry) Touch(_ time.Time) {}
+func (r *Registry) DeleteHost(host string) {
+	if host == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.states, host)
+	delete(r.hits, host)
+	delete(r.flows, host)
+}
+
+func (r *Registry) ClearFlows(host string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if host == "" {
+		r.flows = make(map[string][]gomitm.Flow)
+		return
+	}
+	delete(r.flows, host)
+}
+
+func (r *Registry) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.states = make(map[string]DomainState)
+	r.hits = make(map[string]int64)
+	r.flows = make(map[string][]gomitm.Flow)
+}

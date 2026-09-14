@@ -10,7 +10,37 @@ import (
 func adminMux(dataDir string, reg *Registry, rules *RuleEngine, token string, hub *Hub, caPEM []byte, bind string, app *App) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/domains", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			host := r.URL.Query().Get("host")
+			if host == "" {
+				http.Error(w, "host required", 400)
+				return
+			}
+			reg.DeleteHost(host)
+			_ = savePersist(dataDir, reg, rules)
+			writeJSON(w, map[string]any{"ok": true, "host": host})
+			return
+		}
 		writeJSON(w, reg.Domains())
+	})
+	mux.HandleFunc("/history", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			http.Error(w, "DELETE only", 405)
+			return
+		}
+		scope := r.URL.Query().Get("scope")
+		host := r.URL.Query().Get("host")
+		switch scope {
+		case "all":
+			reg.Reset()
+		case "flows":
+			reg.ClearFlows(host)
+		default:
+			http.Error(w, "scope=all|flows", 400)
+			return
+		}
+		_ = savePersist(dataDir, reg, rules)
+		writeJSON(w, map[string]any{"ok": true, "scope": scope, "host": host})
 	})
 	mux.HandleFunc("/flows", func(w http.ResponseWriter, r *http.Request) {
 		host := r.URL.Query().Get("host")

@@ -183,6 +183,9 @@ details.card summary::-webkit-details-marker { display:none; }
   </div>
   <div class="col">
     <p class="hint" data-i="domains_h">OBSERVED leaves TLS intact. INTERCEPT decrypts. MOCK returns a local reply.</p>
+    <div class="actions" style="margin-bottom:8px">
+      <button type="button" class="ghost" id="resetAllBtn" data-i="reset_all">Clear all</button>
+    </div>
     <table>
       <thead><tr><th data-i="host">Host</th><th data-i="mode">Mode</th><th></th></tr></thead>
       <tbody id="domains"></tbody>
@@ -242,6 +245,9 @@ details.card summary::-webkit-details-marker { display:none; }
   </div>
   <div class="col">
     <p class="hint" data-i="traffic_h">Select a host, then mock or rewrite a request.</p>
+    <div class="actions" style="margin-bottom:8px">
+      <button type="button" class="ghost" id="clearFlowsBtn" data-i="clear_flows">Clear requests</button>
+    </div>
     <div id="flows"></div>
     <div id="detail"></div>
   </div>
@@ -301,7 +307,7 @@ details.card summary::-webkit-details-marker { display:none; }
 <script>
 const I18N = {
   en: {
-    domains:"Domains", domains_h:"OBSERVED leaves TLS intact. INTERCEPT decrypts. MOCK returns a local reply.",
+    domains:"Domains", domains_h:"OBSERVED leaves TLS intact. INTERCEPT decrypts that exact hostname only (api.example.com is not example.com). MOCK returns a local reply. The client process must trust SkyTap CA before INTERCEPT.",
     host:"Host", mode:"Mode", traffic:"Traffic", traffic_h:"Select a host, then mock or rewrite a request.",
     rules:"Rules", rules_h:"Persisted on disk. Mock skips upstream; rewrite still forwards.",
     new_rule:"New rule", rule_h:"Mock never hits the server. Rewrite still does, with JSON patched.",
@@ -318,10 +324,11 @@ const I18N = {
     pin_on:"Enable bypass", pin_off:"Disable bypass", pin_en:"bypass ON", pin_dis:"bypass OFF",
     kit_sum:"Patched client (this host)", kit_h:"Kit/impersonate apply only to hosts you enable. Capture stores origin public cert.",
     kit_en:"Kit policy", kit_imp:"Impersonate origin cert", kit_pin:"Pin", kit_ver:"Verify",
-    kit_cap:"Capture origin cert", kit_save:"Save", kit_need:"Select a domain first."
+    kit_cap:"Capture origin cert", kit_save:"Save", kit_need:"Select a domain first.",
+    reset_all:"Clear all", clear_flows:"Clear requests", forget:"Forget"
   },
   tr: {
-    domains:"Alan adları", domains_h:"OBSERVED TLS’e dokunmaz. INTERCEPT çözer. MOCK yerel cevap döner.",
+    domains:"Alan adları", domains_h:"OBSERVED TLS’e dokunmaz. INTERCEPT yalnızca o tam hostname’i çözer (api.example.com, example.com değildir). MOCK yerel cevap. INTERCEPT öncesi istemci SkyTap CA’ya güvenmeli.",
     host:"Host", mode:"Mod", traffic:"Trafik", traffic_h:"Alan seçin; ardından sahte cevap veya istek değişimi.",
     rules:"Kurallar", rules_h:"Diskte saklanır. Mock upstream’e gitmez; rewrite gider.",
     new_rule:"Yeni kural", rule_h:"Mock sunucuya gitmez. Rewrite JSON’u değiştirip iletir.",
@@ -338,7 +345,8 @@ const I18N = {
     pin_on:"Bypass aç", pin_off:"Bypass kapat", pin_en:"bypass AÇIK", pin_dis:"bypass KAPALI",
     kit_sum:"Yamalı istemci (bu host)", kit_h:"Kit/impersonate yalnız açtığın host’larda. Capture origin public cert yazar.",
     kit_en:"Kit politikası", kit_imp:"Origin cert yüzü", kit_pin:"Pin", kit_ver:"Verify",
-    kit_cap:"Origin cert çek", kit_save:"Kaydet", kit_need:"Önce alan seç."
+    kit_cap:"Origin cert çek", kit_save:"Kaydet", kit_need:"Önce alan seç.",
+    reset_all:"Hepsini sil", clear_flows:"İstekleri sil", forget:"Unut"
   },
   ar: {
     domains:"النطاقات", domains_h:"OBSERVED لا يلمس TLS. INTERCEPT يفك التشفير. MOCK يرد محلياً.",
@@ -354,7 +362,8 @@ const I18N = {
     empty_rules:"لا قواعد.", mock:"محاكاة", rewrite:"تعديل", del:"حذف",
     saved_m:"حُفظت المحاكاة", saved_r:"حُفظ التعديل", deleted:"حُذفت القاعدة", filled:"امتلأ النموذج — احفظ يميناً",
     ca_done:"ثُبّتت الشهادة", any:"(أي مضيف)", req:"الطلب", res:"الرد",
-    pin_sum:"SSL pin lab", pin_h:"Pinning is client-side.", pin_on:"Enable bypass", pin_off:"Disable bypass", pin_en:"bypass ON", pin_dis:"bypass OFF"
+    pin_sum:"SSL pin lab", pin_h:"Pinning is client-side.", pin_on:"Enable bypass", pin_off:"Disable bypass", pin_en:"bypass ON", pin_dis:"bypass OFF",
+    reset_all:"Clear all", clear_flows:"Clear requests", forget:"Forget"
   },
   ru: {
     domains:"Домены", domains_h:"OBSERVED не трогает TLS. INTERCEPT расшифровывает. MOCK отвечает локально.",
@@ -370,7 +379,8 @@ const I18N = {
     empty_rules:"Правил нет.", mock:"Mock", rewrite:"Rewrite", del:"Удалить",
     saved_m:"Mock сохранён", saved_r:"Rewrite сохранён", deleted:"Правило удалено", filled:"Форма заполнена — сохраните справа",
     ca_done:"CA установлен", any:"(любой хост)", req:"Запрос", res:"Ответ",
-    pin_sum:"SSL pin lab", pin_h:"Pinning is client-side.", pin_on:"Enable bypass", pin_off:"Disable bypass", pin_en:"bypass ON", pin_dis:"bypass OFF"
+    pin_sum:"SSL pin lab", pin_h:"Pinning is client-side.", pin_on:"Enable bypass", pin_off:"Disable bypass", pin_en:"bypass ON", pin_dis:"bypass OFF",
+    reset_all:"Clear all", clear_flows:"Clear requests", forget:"Forget"
   }
 };
 const LAYOUT_KEY = "skytap_layout";
@@ -568,11 +578,30 @@ async function loadDomains() {
   (list||[]).sort((a,b)=>a.host.localeCompare(b.host)).forEach(d => {
     const tr = document.createElement("tr");
     if (d.host === selectedHost) tr.className = "sel";
-    tr.innerHTML = `<td></td><td></td><td style="color:var(--muted)">${d.hits||0}</td>`;
+    tr.innerHTML = `<td></td><td></td><td style="color:var(--muted)">${d.hits||0}</td><td></td>`;
     tr.children[0].textContent = d.host;
     tr.children[1].appendChild(stateSelect(d.host, d.state));
+    const forget = document.createElement("button");
+    forget.type = "button";
+    forget.className = "ghost";
+    forget.textContent = t("forget");
+    forget.onclick = async (ev) => {
+      ev.stopPropagation();
+      await api("/domains?host=" + encodeURIComponent(d.host), { method: "DELETE" });
+      if (selectedHost === d.host) {
+        selectedHost = "";
+        sessionStorage.removeItem(HOST_KEY);
+        flows = [];
+        selectedFlow = null;
+        document.getElementById("detail").innerHTML = "";
+        renderFlows();
+      }
+      toast(t("deleted"));
+      loadDomains();
+    };
+    tr.children[3].appendChild(forget);
     tr.onclick = (e) => {
-      if (e.target.tagName==="SELECT") return;
+      if (e.target.tagName==="SELECT" || e.target.tagName==="BUTTON") return;
       document.querySelectorAll("#domains tr").forEach(x=>x.classList.remove("sel"));
       tr.className = "sel";
       selectHost(d.host);
@@ -747,6 +776,32 @@ function bindUI() {
       paintCA(await api("/ca/trust", { method: "POST", body: "{}" }));
       toast(t("ca_done"));
     } catch (e) { toast(e.message, true); }
+  };
+  const resetAll = document.getElementById("resetAllBtn");
+  if (resetAll) resetAll.onclick = async () => {
+    await api("/history?scope=all", { method: "DELETE" });
+    selectedHost = "";
+    sessionStorage.removeItem(HOST_KEY);
+    flows = [];
+    selectedFlow = null;
+    const det = document.getElementById("detail");
+    if (det) det.innerHTML = "";
+    document.getElementById("flowHost").textContent = "";
+    toast(t("reset_all"));
+    await loadDomains();
+    renderFlows();
+  };
+  const clearFlows = document.getElementById("clearFlowsBtn");
+  if (clearFlows) clearFlows.onclick = async () => {
+    const q = selectedHost ? "&host=" + encodeURIComponent(selectedHost) : "";
+    await api("/history?scope=flows" + q, { method: "DELETE" });
+    if (selectedHost) flows = flows.filter(f => f.host !== selectedHost);
+    else flows = [];
+    selectedFlow = null;
+    const det = document.getElementById("detail");
+    if (det) det.innerHTML = "";
+    toast(t("clear_flows"));
+    renderFlows();
   };
 }
 function paintCA(st) {
