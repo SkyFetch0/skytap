@@ -24,6 +24,7 @@ func main() {
 	adminToken := flag.String("admin-token", os.Getenv("SKYTAP_ADMIN_TOKEN"), "Bearer token for admin+MCP (required unless bind is loopback)")
 	data := flag.String("data", "/data", "persist dir (CA + state.json + rules.json)")
 	keyLogPath := flag.String("keylog", os.Getenv("SSLKEYLOGFILE"), "NSS TLS key log path (SSLKEYLOGFILE)")
+	verifyUp := flag.Bool("verify-upstream", false, "verify origin TLS with the system CA (default skip)")
 	install := flag.Bool("install-rules", true, "install nft/iptables capture rules")
 	mode := flag.String("mode", "output", "output|prerouting")
 	ports := flag.String("ports", "80,443", "comma-separated TCP ports to redirect")
@@ -61,7 +62,7 @@ func main() {
 	kit := NewSSLKitStore(*data, "/certs")
 	hub := NewHub()
 	app := &App{reg: reg, rules: rules, hub: hub, dataDir: *data, kit: kit, pinBypass: loadPinBypass(*data)}
-	eng := gomitm.New(ca, app)
+	eng := gomitm.New(ca, app).WithUpstreamVerify(*verifyUp)
 	if *keyLogPath != "" {
 		if err := os.MkdirAll(filepath.Dir(*keyLogPath), 0o755); err != nil {
 			log.Fatal(err)

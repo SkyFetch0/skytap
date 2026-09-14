@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -194,21 +195,32 @@ func adminMux(dataDir string, reg *Registry, rules *RuleEngine, token string, hu
 		}
 		if path == "/ws" {
 			q := r.URL.Query().Get("token")
-			if q == "" || q != token {
+			if !tokenOK(q, token) {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
 			mux.ServeHTTP(w, r)
 			return
 		}
-		// REST / MCP / CA: Bearer header only — never ?token= (access logs).
-		if r.Header.Get("Authorization") != "Bearer "+token {
+		if !tokenOK(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), token) {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+func tokenOK(got, token string) bool {
+	if token == "" {
+		return false
+	}
+	gb, wb := []byte(got), []byte(token)
+	if len(gb) != len(wb) {
+		subtle.ConstantTimeCompare(wb, wb)
+		return false
+	}
+	return subtle.ConstantTimeCompare(gb, wb) == 1
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

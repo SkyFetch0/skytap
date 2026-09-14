@@ -2,5 +2,7 @@ github.com/SkyFetch0/gomitm v0.1.0 h1:H1Y/BOpAsGXhVjNoET8JsYVUKtB00+MuNHM848OpwO
 github.com/SkyFetch0/gomitm v0.1.0/go.mod h1:02EvLhTFVUMdnv/eUeEZE76EAb85NjO0JHab+MUbEdA=
 github.com/SkyFetch0/gomitm v0.1.1 h1:hunN+zHqjpBrAVvMIAFsnrkDg4WN5/mj6fwQtAoxxLo=
 github.com/SkyFetch0/gomitm v0.1.1/go.mod h1:02EvLhTFVUMdnv/eUeEZE76EAb85NjO0JHab+MUbEdA=
+github.com/SkyFetch0/gomitm v0.1.2 h1:ky5/MRDZssMJd0wtlwQ9U4CFFlSACOuv1okc5XNKQfc=
+github.com/SkyFetch0/gomitm v0.1.2/go.mod h1:02EvLhTFVUMdnv/eUeEZE76EAb85NjO0JHab+MUbEdA=
 github.com/SkyFetch0/skydst v0.1.0 h1:8awFluPguXcbabQBaM7+FFeEkABJBQlvf72eF8mmPYU=
 github.com/SkyFetch0/skydst v0.1.0/go.mod h1:OqyCLnsuNNAZ4j4gBfdWip8fHXgu/jm3RNipTQf/7rc=

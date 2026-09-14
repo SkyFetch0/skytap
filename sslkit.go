@@ -198,22 +198,25 @@ func (s *SSLKitStore) writeClientConfLocked() error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	var kit, imp []string
-	pin, verify := "off", "ca"
+	var kit, imp, pins, vers []string
 	for _, p := range s.hosts {
 		if p.Kit {
 			kit = append(kit, p.Host)
 		}
 		if p.Impersonate {
 			imp = append(imp, p.Host)
-			pin = p.Pin
-			verify = p.Verify
+		}
+		if p.Pin != "" {
+			pins = append(pins, p.Host+"="+p.Pin)
+		}
+		if p.Verify != "" {
+			vers = append(vers, p.Host+"="+p.Verify)
 		}
 	}
 	body := fmt.Sprintf(
-		"SKYTAP_SSL_PIN=%s\nSKYTAP_SSL_VERIFY=%s\nSKYTAP_SSL_CA=/certs/ca.crt\nSKYTAP_SSL_PROXY=http://skytap:8080\nSKYTAP_SSL_ORIGIN_CERT_DIR=/certs/origin-cache\nSKYTAP_SSL_KIT_HOSTS=%s\nSKYTAP_SSL_IMPERSONATE_HOSTS=%s\nSKYTAP_SSL_IMPERSONATE=%s\n",
-		pin, verify, strings.Join(kit, ","), strings.Join(imp, ","),
-		boolEnv(len(imp) > 0),
+		"SKYTAP_SSL_CA=/certs/ca.crt\nSKYTAP_SSL_PROXY=http://skytap:8080\nSKYTAP_SSL_ORIGIN_CERT_DIR=/certs/origin-cache\nSKYTAP_SSL_KIT_HOSTS=%s\nSKYTAP_SSL_IMPERSONATE_HOSTS=%s\nSKYTAP_SSL_IMPERSONATE=%s\nSKYTAP_SSL_PIN_BY_HOST=%s\nSKYTAP_SSL_VERIFY_BY_HOST=%s\n",
+		strings.Join(kit, ","), strings.Join(imp, ","),
+		boolEnv(len(imp) > 0), strings.Join(pins, ","), strings.Join(vers, ","),
 	)
 	return os.WriteFile(filepath.Join(dir, "skytap-ssl.conf"), []byte(body), 0o644)
 }

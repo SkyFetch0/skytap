@@ -152,24 +152,39 @@ func handleSOCKS5(c net.Conn, eng *gomitm.Engine) {
 	switch req[3] {
 	case 0x01:
 		addr := make([]byte, 4)
-		io.ReadFull(br, addr)
+		if _, err := io.ReadFull(br, addr); err != nil {
+			c.Close()
+			return
+		}
 		host = net.IP(addr).String()
 	case 0x03:
 		l := make([]byte, 1)
-		io.ReadFull(br, l)
+		if _, err := io.ReadFull(br, l); err != nil {
+			c.Close()
+			return
+		}
 		name := make([]byte, l[0])
-		io.ReadFull(br, name)
+		if _, err := io.ReadFull(br, name); err != nil {
+			c.Close()
+			return
+		}
 		host = string(name)
 	case 0x04:
 		addr := make([]byte, 16)
-		io.ReadFull(br, addr)
+		if _, err := io.ReadFull(br, addr); err != nil {
+			c.Close()
+			return
+		}
 		host = net.IP(addr).String()
 	default:
 		c.Close()
 		return
 	}
 	portb := make([]byte, 2)
-	io.ReadFull(br, portb)
+	if _, err := io.ReadFull(br, portb); err != nil {
+		c.Close()
+		return
+	}
 	port := int(portb[0])<<8 | int(portb[1])
 	dst := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	_, _ = c.Write([]byte{0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0})

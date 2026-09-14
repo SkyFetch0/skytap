@@ -24,6 +24,8 @@ Those two do not import each other. SkyTap wires them together with policy, pers
 
 Unknown hosts stay **OBSERVED**. Nothing is decrypted until you promote a domain.
 
+Terminated TLS is HTTP/1.1 only (no `h2` ALPN). WebSocket/SSE on an INTERCEPTed host is spliced to origin after the HTTP request line. Upstream TLS is not verified unless `-verify-upstream` is set. Flow body sizes are capped at 64 KiB (`ReqTruncated` / `ResTruncated`); `ResSize` uses `Content-Length` when present.
+
 ---
 
 ## Install
