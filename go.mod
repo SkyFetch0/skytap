@@ -1,10 +1,11 @@
 module github.com/SkyFetch0/skytap
 
-go 1.22
+go 1.22.0
 
 require (
 	github.com/SkyFetch0/gomitm v0.1.6
 	github.com/SkyFetch0/skydst v0.1.0
+	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca
 )
 
 require (

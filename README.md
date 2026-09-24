@@ -155,6 +155,14 @@ incus exec c1 -- update-ca-certificates
 | `GET /flows?host=` | Recent flows |
 | `GET /state?host=&state=` | `OBSERVED` / `INTERCEPTED` / `MOCKED` |
 | `GET` / `POST` / `DELETE /rules` | Mock and rewrite rules |
+
+### Rules
+
+Rules match host, path, and method. `mock` returns a local body; `rewrite` edits the request and forwards it.
+
+A rule may set `script` (Starlark). The global `out`, or the value of a single expression, becomes the whole mock body or rewrite body. Builtins: `now`, `now_ms`, `iso`, `date`, `plus`, plus `path`, `host`, `method`, and `query`.
+
+Inline markers work inside a body: `{{script: date(86400*365)}}` is replaced, then `{{path}}` and `{{host}}` templates run. A rewrite JSON value starting with `=` is an expression, for example `"next_check": "=plus(100)"`. A script error leaves the original text unchanged.
 | `GET /ca.pem` | Public CA |
 | `POST /ca/trust` | Install CA on this machine (Linux) |
 | `GET /ws?token=` | Live flows |

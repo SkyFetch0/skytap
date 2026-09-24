@@ -5,27 +5,35 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
+	"time"
+
+	"go.starlark.net/starlark"
 )
 
 type Rule struct {
-	ID      string `json:"id,omitempty"`
-	Host    string `json:"host"`
-	Path    string `json:"path"`
-	Method  string `json:"method"`
-	Status  int    `json:"status"`
-	Body    string `json:"body"`
-	Type    string `json:"content_type"`
+	ID     string `json:"id,omitempty"`
+	Host   string `json:"host"`
+	Path   string `json:"path"`
+	Method string `json:"method"`
+	Status int    `json:"status"`
+	Body   string `json:"body"`
+	Type   string `json:"content_type"`
 	// Action: "mock" (default) short-circuits; "rewrite" mutates the request then forwards upstream.
 	Action string `json:"action,omitempty"`
 	// RewriteJSON merges these keys into a JSON object body (e.g. {"domain":"test.com"}).
 	RewriteJSON map[string]string `json:"rewrite_json,omitempty"`
 	// RewriteBody replaces the entire request body (templates allowed). Overrides RewriteJSON if set.
 	RewriteBody string `json:"rewrite_body,omitempty"`
+	// Script is starlark; the last expression or `out` is the string used.
+	Script string `json:"script,omitempty"`
 }
 
 type RuleEngine struct {
@@ -126,8 +134,12 @@ func (e *RuleEngine) Match(host string, req *http.Request) *http.Response {
 }
 
 func applyRewrite(req *http.Request, r *Rule) {
-	if r.RewriteBody != "" {
-		body := applyTpl(r.RewriteBody, req)
+	if r.RewriteBody != "" || r.Script != "" {
+		src := r.RewriteBody
+		if r.Script != "" {
+			src = r.Script
+		}
+		body := evalBody(src, r.Script != "", req)
 		req.Body = io.NopCloser(strings.NewReader(body))
 		req.ContentLength = int64(len(body))
 		req.GetBody = func() (io.ReadCloser, error) {
@@ -148,7 +160,7 @@ func applyRewrite(req *http.Request, r *Rule) {
 		obj = map[string]any{}
 	}
 	for k, v := range r.RewriteJSON {
-		obj[k] = applyTpl(v, req)
+		obj[k] = evalJSONValue(v, req)
 	}
 	out, err := json.Marshal(obj)
 	if err != nil {
@@ -176,22 +188,176 @@ func renderRule(r Rule, req *http.Request) *http.Response {
 	if status == 0 {
 		status = 200
 	}
-	body := applyTpl(r.Body, req)
+	src := r.Body
+	whole := false
+	if r.Script != "" {
+		src = r.Script
+		whole = true
+	}
+	body := evalBody(src, whole, req)
 	ct := r.Type
 	if ct == "" {
 		ct = "application/json"
 	}
 	resp := &http.Response{
-		StatusCode: status,
-		Proto:      "HTTP/1.1",
-		ProtoMajor: 1,
-		ProtoMinor: 1,
-		Header:     make(http.Header),
-		Body:       io.NopCloser(strings.NewReader(body)),
+		StatusCode:    status,
+		Proto:         "HTTP/1.1",
+		ProtoMajor:    1,
+		ProtoMinor:    1,
+		Header:        make(http.Header),
+		Body:          io.NopCloser(strings.NewReader(body)),
 		ContentLength: int64(len(body)),
 	}
 	resp.Header.Set("Content-Type", ct)
 	return resp
+}
+
+var scriptMarker = regexp.MustCompile(`\{\{script:\s*(.*?)\}\}`)
+
+// evalBody applies a whole-body starlark program when whole is set, otherwise
+// replaces {{script: expr}} markers, then runs the {{path}}/{{host}} templates.
+func evalBody(s string, whole bool, req *http.Request) string {
+	if whole {
+		if out, ok := runProgram(s, req); ok {
+			s = out
+		}
+	} else {
+		s = scriptMarker.ReplaceAllStringFunc(s, func(m string) string {
+			sub := scriptMarker.FindStringSubmatch(m)
+			if len(sub) < 2 {
+				return m
+			}
+			if out, ok := evalExpr(strings.TrimSpace(sub[1]), req); ok {
+				return out
+			}
+			return m
+		})
+	}
+	return applyTpl(s, req)
+}
+
+// evalJSONValue treats a leading "=" as a starlark expression; otherwise a template.
+func evalJSONValue(v string, req *http.Request) string {
+	if strings.HasPrefix(v, "=") {
+		if out, ok := evalExpr(strings.TrimSpace(v[1:]), req); ok {
+			return out
+		}
+		return v
+	}
+	return evalBody(v, false, req)
+}
+
+func starlarkThread() *starlark.Thread {
+	th := &starlark.Thread{Name: "rule"}
+	th.SetMaxExecutionSteps(100000)
+	return th
+}
+
+func builtins(req *http.Request) starlark.StringDict {
+	path, host, method := "", "", ""
+	q := map[string]string{}
+	if req != nil {
+		if req.URL != nil {
+			path = req.URL.Path
+			q = queryMap(req)
+		}
+		host = req.Host
+		method = req.Method
+	}
+	qm := starlark.NewDict(len(q))
+	for k, v := range q {
+		_ = qm.SetKey(starlark.String(k), starlark.String(v))
+	}
+	now := func(_ *starlark.Thread, _ *starlark.Builtin, _ starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		return starlark.MakeInt64(time.Now().Unix()), nil
+	}
+	nowMS := func(_ *starlark.Thread, _ *starlark.Builtin, _ starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		return starlark.MakeInt64(time.Now().UnixMilli()), nil
+	}
+	offsetOf := func(args starlark.Tuple) int64 {
+		if len(args) == 0 {
+			return 0
+		}
+		n, err := starlark.AsInt32(args[0])
+		if err != nil {
+			i, ok := args[0].(starlark.Int)
+			if !ok {
+				return 0
+			}
+			v, ok := i.Int64()
+			if !ok {
+				return 0
+			}
+			return v
+		}
+		return int64(n)
+	}
+	iso := func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		t := time.Now().UTC().Add(time.Duration(offsetOf(args)) * time.Second)
+		return starlark.String(t.Format(time.RFC3339)), nil
+	}
+	date := func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		t := time.Now().UTC().Add(time.Duration(offsetOf(args)) * time.Second)
+		return starlark.String(t.Format("2006-01-02")), nil
+	}
+	plus := func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		return starlark.MakeInt64(time.Now().Unix() + offsetOf(args)), nil
+	}
+	return starlark.StringDict{
+		"now":    starlark.NewBuiltin("now", now),
+		"now_ms": starlark.NewBuiltin("now_ms", nowMS),
+		"iso":    starlark.NewBuiltin("iso", iso),
+		"date":   starlark.NewBuiltin("date", date),
+		"plus":   starlark.NewBuiltin("plus", plus),
+		"path":   starlark.String(path),
+		"host":   starlark.String(host),
+		"method": starlark.String(method),
+		"query":  qm,
+	}
+}
+
+func evalExpr(src string, req *http.Request) (string, bool) {
+	v, err := starlark.Eval(starlarkThread(), "expr", src, builtins(req))
+	if err != nil {
+		return "", false
+	}
+	return stringify(v), true
+}
+
+func runProgram(src string, req *http.Request) (string, bool) {
+	env := builtins(req)
+	g, err := starlark.ExecFile(starlarkThread(), "script", src, env)
+	if err != nil {
+		return "", false
+	}
+	if out, ok := g["out"]; ok {
+		return stringify(out), true
+	}
+	if v, err := starlark.Eval(starlarkThread(), "expr", src, builtins(req)); err == nil {
+		return stringify(v), true
+	}
+	return "", false
+}
+
+func stringify(v starlark.Value) string {
+	switch x := v.(type) {
+	case starlark.String:
+		return string(x)
+	case starlark.Int:
+		if i, ok := x.Int64(); ok {
+			return strconv.FormatInt(i, 10)
+		}
+		return x.String()
+	case starlark.Float:
+		return strconv.FormatFloat(float64(x), 'f', -1, 64)
+	case starlark.Bool:
+		if x {
+			return "true"
+		}
+		return "false"
+	default:
+		return fmt.Sprint(v)
+	}
 }
 
 func applyTpl(s string, req *http.Request) string {

@@ -288,6 +288,9 @@ details.card summary::-webkit-details-marker { display:none; }
   "domain": "test.com"
 }</textarea>
       </div>
+      <label data-i="script_lbl">Script (starlark)</label>
+      <textarea name="script" rows="3" placeholder="out = '{&quot;expires_at&quot;:&quot;' + date(86400*400) + '&quot;,&quot;next_check&quot;:' + str(plus(100)) + '}'"></textarea>
+      <p class="hint" data-i="script_h">Optional. Sets the whole mock/rewrite body. Inline {{script: date(3600)}} and rewrite JSON value =plus(100) also work. Builtins: now, now_ms, iso, date, plus, path, host, method, query.</p>
       <div class="actions">
         <button class="primary" type="submit" data-i="save">Save</button>
       </div>
@@ -313,6 +316,7 @@ const I18N = {
     new_rule:"New rule", rule_h:"Mock never hits the server. Rewrite still does, with JSON patched.",
     kind:"Kind", kind_mock:"Mock — fake response", kind_rw:"Rewrite — change request, then forward",
     path:"Path", method:"Method", status:"Status", res_body:"Response body", rw_json:"JSON fields to set",
+    script_lbl:"Script (starlark)", script_h:"Optional. Sets the whole mock/rewrite body. Inline {{script: date(3600)}} and rewrite JSON value =plus(100) also work. Builtins: now, now_ms, iso, date, plus, path, host, method, query.",
     save:"Save", ca_dl:"Download CA", ca_sum:"Certificate", ca_h:"Decrypt clients must trust this CA. Path follows the OS SkyTap is running on.",
     ca_install:"Install CA here", ca_ok:"Trusted on this OS", ca_mark:"Will restore on start", ca_no:"Not in this OS store",
     token:"Admin token", token_h:"Same as -admin-token", continue:"Continue",
@@ -334,6 +338,7 @@ const I18N = {
     new_rule:"Yeni kural", rule_h:"Mock sunucuya gitmez. Rewrite JSON’u değiştirip iletir.",
     kind:"Tür", kind_mock:"Mock — sahte cevap", kind_rw:"Rewrite — isteği değiştir, ilet",
     path:"Yol", method:"Yöntem", status:"Durum", res_body:"Cevap gövdesi", rw_json:"Yazılacak JSON alanları",
+    script_lbl:"Betik (starlark)", script_h:"İsteğe bağlı. Tüm mock/rewrite gövdesini belirler. Satır içi {{script: date(3600)}} ve rewrite JSON değeri =plus(100) de çalışır. Yerleşikler: now, now_ms, iso, date, plus, path, host, method, query.",
     save:"Kaydet", ca_dl:"CA indir", ca_sum:"Sertifika", ca_h:"Çözülen istemci bu CA’ya güvenmeli. Yol, SkyTap’ın çalıştığı işletim sistemine göredir.",
     ca_install:"CA’yı buraya kur", ca_ok:"Bu OS deposunda", ca_mark:"Açılışta yeniden kurulur", ca_no:"Bu OS deposunda yok",
     token:"Yönetici jetonu", token_h:"-admin-token ile aynı", continue:"Devam",
@@ -355,6 +360,7 @@ const I18N = {
     new_rule:"قاعدة جديدة", rule_h:"المحاكاة لا تلمس الخادم. التعديل يغيّر JSON ثم يمرّر.",
     kind:"النوع", kind_mock:"محاكاة — رد مزيف", kind_rw:"تعديل — غيّر الطلب ثم أرسل",
     path:"المسار", method:"الطريقة", status:"الحالة", res_body:"جسم الرد", rw_json:"حقول JSON للكتابة",
+    script_lbl:"Script (starlark)", script_h:"Optional. Sets the whole mock/rewrite body. Inline {{script: date(3600)}} and rewrite JSON value =plus(100) also work. Builtins: now, now_ms, iso, date, plus, path, host, method, query.",
     save:"حفظ", ca_dl:"تنزيل CA", ca_sum:"الشهادة", ca_h:"العميل الذي تُفكّ تشفيره يجب أن يثق بهذه الشهادة. المسار حسب نظام تشغيل SkyTap.",
     ca_install:"تثبيت CA هنا", ca_ok:"موجودة في مخزن هذا النظام", ca_mark:"ستُعاد عند التشغيل", ca_no:"ليست في مخزن هذا النظام",
     token:"رمز الإدارة", token_h:"نفس -admin-token", continue:"متابعة",
@@ -372,6 +378,7 @@ const I18N = {
     new_rule:"Новое правило", rule_h:"Mock не касается сервера. Rewrite меняет JSON и пересылает.",
     kind:"Тип", kind_mock:"Mock — поддельный ответ", kind_rw:"Rewrite — изменить запрос и отправить",
     path:"Путь", method:"Метод", status:"Статус", res_body:"Тело ответа", rw_json:"JSON-поля для записи",
+    script_lbl:"Script (starlark)", script_h:"Optional. Sets the whole mock/rewrite body. Inline {{script: date(3600)}} and rewrite JSON value =plus(100) also work. Builtins: now, now_ms, iso, date, plus, path, host, method, query.",
     save:"Сохранить", ca_dl:"Скачать CA", ca_sum:"Сертификат", ca_h:"Клиент, чей HTTPS вы расшифровываете, должен доверять этому CA. Путь зависит от ОС, где запущен SkyTap.",
     ca_install:"Установить CA здесь", ca_ok:"В хранилище этой ОС", ca_mark:"Будет восстановлен при старте", ca_no:"Нет в хранилище этой ОС",
     token:"Токен администратора", token_h:"Как -admin-token", continue:"Далее",
@@ -718,6 +725,8 @@ function bindUI() {
     const body = Object.fromEntries(fd.entries());
     const action = body.action || "mock";
     const payload = { host: body.host, path: body.path, method: body.method, action };
+    if (body.script) payload.script = body.script;
+    if (body.script) payload.script = body.script;
     if (action === "rewrite") {
       try { payload.rewrite_json = JSON.parse(body.rewrite_json || "{}"); }
       catch (err) { toast("JSON", true); return; }
