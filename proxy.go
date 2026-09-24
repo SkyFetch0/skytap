@@ -177,6 +177,7 @@ func handleSOCKS5(c net.Conn, eng *gomitm.Engine) {
 		}
 		host = net.IP(addr).String()
 	default:
+		_, _ = c.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		c.Close()
 		return
 	}

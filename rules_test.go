@@ -84,6 +84,22 @@ func TestScriptSyntaxErrorFallsBack(t *testing.T) {
 	}
 }
 
+func TestInfiniteBuiltinLoopFallsBack(t *testing.T) {
+	const body = "while True:\n  now()\n"
+	done := make(chan string, 1)
+	go func() {
+		done <- evalBody(body, true, nil)
+	}()
+	select {
+	case got := <-done:
+		if got != body {
+			t.Fatalf("got %q", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("script hung")
+	}
+}
+
 func TestApplyRewriteEmptyBody(t *testing.T) {
 	req, _ := http.NewRequest("POST", "http://h/x", nil)
 	applyRewrite(req, &Rule{RewriteJSON: map[string]string{"domain": "test.com"}})

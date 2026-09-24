@@ -84,6 +84,9 @@ After=network.target
 Type=simple
 User=root
 ExecStart=$PREFIX/bin/skytap -listen $LISTEN -admin $ADMIN -data $DATA -install-rules=true -mode output ${TOKEN:+-admin-token $TOKEN}
+ExecStop=/bin/sh -c 'nft delete table ip skytap 2>/dev/null || true'
+KillMode=mixed
+TimeoutStopSec=5
 Restart=on-failure
 AmbientCapabilities=CAP_NET_ADMIN
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SETUID

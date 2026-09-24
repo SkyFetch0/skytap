@@ -249,8 +249,21 @@ func evalJSONValue(v string, req *http.Request) string {
 
 func starlarkThread() *starlark.Thread {
 	th := &starlark.Thread{Name: "rule"}
-	th.SetMaxExecutionSteps(100000)
+	th.SetMaxExecutionSteps(10000)
+	th.SetLocal("t0", time.Now())
 	return th
+}
+
+// checkScriptDeadline stops builtin-only loops that never spend execution steps.
+func checkScriptDeadline(th *starlark.Thread) error {
+	if th == nil {
+		return nil
+	}
+	t0, _ := th.Local("t0").(time.Time)
+	if !t0.IsZero() && time.Since(t0) > 50*time.Millisecond {
+		return fmt.Errorf("script timeout")
+	}
+	return nil
 }
 
 func builtins(req *http.Request) starlark.StringDict {
@@ -268,10 +281,16 @@ func builtins(req *http.Request) starlark.StringDict {
 	for k, v := range q {
 		_ = qm.SetKey(starlark.String(k), starlark.String(v))
 	}
-	now := func(_ *starlark.Thread, _ *starlark.Builtin, _ starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+	now := func(th *starlark.Thread, _ *starlark.Builtin, _ starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		if err := checkScriptDeadline(th); err != nil {
+			return nil, err
+		}
 		return starlark.MakeInt64(time.Now().Unix()), nil
 	}
-	nowMS := func(_ *starlark.Thread, _ *starlark.Builtin, _ starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+	nowMS := func(th *starlark.Thread, _ *starlark.Builtin, _ starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		if err := checkScriptDeadline(th); err != nil {
+			return nil, err
+		}
 		return starlark.MakeInt64(time.Now().UnixMilli()), nil
 	}
 	offsetOf := func(args starlark.Tuple) int64 {
@@ -292,15 +311,24 @@ func builtins(req *http.Request) starlark.StringDict {
 		}
 		return int64(n)
 	}
-	iso := func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+	iso := func(th *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		if err := checkScriptDeadline(th); err != nil {
+			return nil, err
+		}
 		t := time.Now().UTC().Add(time.Duration(offsetOf(args)) * time.Second)
 		return starlark.String(t.Format(time.RFC3339)), nil
 	}
-	date := func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+	date := func(th *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		if err := checkScriptDeadline(th); err != nil {
+			return nil, err
+		}
 		t := time.Now().UTC().Add(time.Duration(offsetOf(args)) * time.Second)
 		return starlark.String(t.Format("2006-01-02")), nil
 	}
-	plus := func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+	plus := func(th *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, _ []starlark.Tuple) (starlark.Value, error) {
+		if err := checkScriptDeadline(th); err != nil {
+			return nil, err
+		}
 		return starlark.MakeInt64(time.Now().Unix() + offsetOf(args)), nil
 	}
 	return starlark.StringDict{

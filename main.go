@@ -103,7 +103,7 @@ func main() {
 			ch := make(chan os.Signal, 1)
 			signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 			<-ch
-			_ = skydst.RemoveRules(spec)
+			_ = skydst.RemoveRules(spec) // removal also happens from systemd ExecStop
 			os.Exit(0)
 		}()
 	}
