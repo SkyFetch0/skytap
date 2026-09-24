@@ -1,0 +1,95 @@
+--- a/lib/setopt.c
++++ b/lib/setopt.c
+@@ -45,6 +45,7 @@
+ #include "vtls/vtls.h"
+ #include "warnless.h"
+ #include "sendf.h"
++#include "skytap_ssl_policy.h"
+ #include "http2.h"
+ #include "setopt.h"
+ #include "multiif.h"
+@@ -3153,6 +3154,41 @@
+     result = CURLE_UNKNOWN_OPTION;
+     break;
+   }
+ 
++  /* SkyTap lab policy: last word after the application's setopt. */
++  if(result == CURLE_OK) {
++    switch(option) {
++    case CURLOPT_PINNEDPUBLICKEY:
++    case CURLOPT_PROXY_PINNEDPUBLICKEY:
++      if(skytap_pin_is_off()) {
++        result = Curl_setstropt(&data->set.str[STRING_SSL_PINNEDPUBLICKEY],
++                                NULL);
++      }
++      else if(skytap_pin_override() && skytap_pin_override()[0]) {
++        char pinbuf[160];
++        msnprintf(pinbuf, sizeof(pinbuf), "sha256//%s",
++                  skytap_pin_override());
++        result = Curl_setstropt(&data->set.str[STRING_SSL_PINNEDPUBLICKEY],
++                                pinbuf);
++      }
++      break;
++    case CURLOPT_SSL_VERIFYPEER:
++      data->set.ssl.primary.verifypeer =
++        skytap_verify_is_none() ? FALSE : TRUE;
++      break;
++    case CURLOPT_SSL_VERIFYHOST:
++      data->set.ssl.primary.verifyhost =
++        skytap_verify_is_none() ? 0 : 2;
++      break;
++    case CURLOPT_CAINFO:
++      if(skytap_ca_path() && skytap_ca_path()[0])
++        result = Curl_setstropt(&data->set.str[STRING_SSL_CAFILE],
++                                skytap_ca_path());
++      break;
++    default:
++      break;
++    }
++  }
++
+   return result;
+ }
+ 
+@@ -3175,8 +3211,41 @@
+ 
+   va_start(arg, tag);
+ 
+   result = Curl_vsetopt(data, tag, arg);
+ 
++  if(result == CURLE_OK && data) {
++    static int forced;
++    if(!forced) {
++      forced = 1;
++      if(skytap_proxy() && skytap_proxy()[0]) {
++        const char *px = skytap_proxy();
++        (void)Curl_setstropt(&data->set.str[STRING_PROXY], px);
++        if(!strncmp(px, "socks5h://", 10) || !strncmp(px, "socks5://", 9))
++          data->set.proxytype = CURLPROXY_SOCKS5_HOSTNAME;
++        else
++          data->set.proxytype = CURLPROXY_HTTP;
++      }
++      if(skytap_ca_path() && skytap_ca_path()[0])
++        (void)Curl_setstropt(&data->set.str[STRING_SSL_CAFILE],
++                             skytap_ca_path());
++      data->set.ssl.primary.verifypeer =
++        skytap_verify_is_none() ? FALSE : TRUE;
++      data->set.ssl.primary.verifyhost =
++        skytap_verify_is_none() ? 0 : 2;
++      if(skytap_pin_is_off())
++        (void)Curl_setstropt(&data->set.str[STRING_SSL_PINNEDPUBLICKEY], NULL);
++      else if(skytap_pin_override() && skytap_pin_override()[0]) {
++        char pinbuf[160];
++        msnprintf(pinbuf, sizeof(pinbuf), "sha256//%s",
++                  skytap_pin_override());
++        (void)Curl_setstropt(&data->set.str[STRING_SSL_PINNEDPUBLICKEY],
++                             pinbuf);
++      }
++      if(skytap_keylog_path() && skytap_keylog_path()[0])
++        setenv("SSLKEYLOGFILE", skytap_keylog_path(), 1);
++    }
++  }
++
+   va_end(arg);
+   return result;
+ }

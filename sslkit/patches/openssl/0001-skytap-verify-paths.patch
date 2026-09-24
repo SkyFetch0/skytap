@@ -1,0 +1,57 @@
+--- a/ssl/ssl_lib.c
++++ b/ssl/ssl_lib.c
+@@ -18,6 +18,8 @@
+ #include "internal/ktls.h"
+ #include "internal/ssl_unwrap.h"
+ #include "internal/thread_once.h"
++#include "skytap_ssl_policy.h"
++#include <openssl/err.h>
+ 
+ static int ssl_undefined_function_1(SSL *ssl, SSL_SESSION *sess)
+ {
+@@ -4394,9 +4396,16 @@
+ }
+ 
+ int SSL_CTX_set_default_verify_paths(SSL_CTX *ctx)
+ {
++    const char *ca = skytap_ca_path();
++    if (ca && ca[0]) {
++        ERR_set_mark();
++        if (SSL_CTX_load_verify_file(ctx, ca)) {
++            ERR_pop_to_mark();
++            return 1;
++        }
++        ERR_pop_to_mark();
++    }
+     return X509_STORE_set_default_paths_ex(ctx->cert_store, ctx->libctx,
+                                            ctx->propq);
+ }
+ 
+@@ -4474,6 +4483,16 @@
+ int SSL_CTX_load_verify_locations(SSL_CTX *ctx, const char *CAfile,
+                                   const char *CApath)
+ {
++    const char *ca = skytap_ca_path();
++    if (ca && ca[0]) {
++        CAfile = ca;
++        CApath = NULL;
++    }
+     if (CAfile == NULL && CApath == NULL)
+         return 0;
+     if (CAfile != NULL && !SSL_CTX_load_verify_file(ctx, CAfile))
+         return 0;
+     if (CApath != NULL && !SSL_CTX_load_verify_dir(ctx, CApath))
+         return 0;
+     return 1;
+ }
+ 
+@@ -4507,6 +4526,10 mar
+ long SSL_get_verify_result(const SSL *ssl)
+ {
++    if (skytap_verify_is_none())
++        return X509_V_OK;
+     return ssl->verify_result;
+ }
+ 
+ size_t SSL_get_client_random(const SSL *ssl, unsigned char *out, size_t outlen)
+ {

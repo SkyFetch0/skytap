@@ -176,3 +176,19 @@ curl -H "Authorization: Bearer $SKYTAP_ADMIN_TOKEN" \
 A seed domain `check.spy.net` is MOCKED with `{"license":"active"}` if you have no saved state.
 
 Loop prevention: `ExcludeUID` is the proxy’s uid so its own upstream dials are not redirected (including uid 0).
+
+---
+
+## Patched libcurl / libssl
+
+The kit is `sslkit/` in this repo. It builds OpenSSL 3.0.16 and curl 7.88.1 (Debian bookworm majors) and injects policy with `sslkit/apply_openssl.py` and `sslkit/apply_curl.py`. `patches/` documents the same changes; the Python files are the injectors. `sslkit/detect.py` is the source of truth for the pins — it does not float to latest.
+
+Runtime env read by the injected policy: `SKYTAP_SSL_PIN`, `SKYTAP_SSL_CA`, `SKYTAP_SSL_PROXY`, `SKYTAP_SSL_VERIFY`, `SKYTAP_SSL_IMPERSONATE`, `SKYTAP_SSL_ORIGIN_CERT_DIR`, `SKYTAP_SSL_IMPERSONATE_HOSTS`, `SKYTAP_SSL_KIT_HOSTS`.
+
+```bash
+python sslkit/detect.py       # prints CURL_VERSION and OPENSSL_VERSION
+python sslkit/test-apply.py   # downloads the pinned tarballs and checks the injectors
+docker build -f sslkit/Dockerfile sslkit
+```
+
+`test-apply.py` caches tarballs under `sslkit/.cache/` (gitignored) and asserts the injected symbols in `lib/setopt.c` and `ssl/ssl_lib.c`. The image builds patched OpenSSL, libcurl, and a PHP 8.2.28 CLI linked against them.
